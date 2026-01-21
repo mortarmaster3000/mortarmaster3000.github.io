@@ -1,3 +1,5 @@
+console.log("app.js loaded");
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
