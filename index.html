@@ -639,12 +639,22 @@
       const otherUser = getOtherUser(currentConversation, currentUser);
 
       try {
+        // First, create/update the conversation document itself
+        await setDoc(doc(db, "dms", currentConversation), {
+          users: [currentUser, otherUser],
+          lastMessage: text,
+          lastMessageTime: serverTimestamp()
+        }, { merge: true });
+
+        // Then add the message to the subcollection
         await addDoc(collection(db, "dms", currentConversation, "messages"), {
           from: currentUser,
           to: otherUser,
           text,
           createdAt: serverTimestamp()
         });
+        
+        console.log("Message sent successfully to conversation:", currentConversation);
         dmInput.value = "";
       } catch (error) {
         console.error("Error sending DM:", error);
