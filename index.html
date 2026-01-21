@@ -1,8 +1,127 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chat App</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+    #auth {
+      max-width: 400px;
+      margin: 50px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    #auth h2 {
+      margin-top: 0;
+    }
+    #auth input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    #auth button {
+      width: 48%;
+      padding: 10px;
+      margin: 5px 1%;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #loginBtn {
+      background: #007bff;
+      color: white;
+    }
+    #registerBtn {
+      background: #28a745;
+      color: white;
+    }
+    #chat {
+      max-width: 800px;
+      margin: 20px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    #logoutBtn {
+      float: right;
+      padding: 8px 16px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .chat-section {
+      margin: 20px 0;
+      clear: both;
+    }
+    .chat-section h2 {
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 10px;
+    }
+    #globalMessages, #dmMessages {
+      height: 250px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      margin: 10px 0;
+      padding: 10px;
+      background: #fafafa;
+      border-radius: 5px;
+    }
+    .message {
+      margin-bottom: 8px;
+      padding: 8px;
+      background: white;
+      border-radius: 6px;
+      border-left: 3px solid #007bff;
+    }
+    .message.own {
+      border-left-color: #28a745;
+      background: #f0f8f0;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .input-group input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .input-group button {
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .input-group button:hover {
+      background: #0056b3;
+    }
+    .error {
+      color: #dc3545;
+      padding: 10px;
+      background: #f8d7da;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+  </style>
 </head>
 <body>
   <div id="auth">
@@ -11,24 +130,269 @@
     <input id="password" type="password" placeholder="Password" />
     <button id="loginBtn">Login</button>
     <button id="registerBtn">Register</button>
+    <div id="authError" class="error" style="display:none;"></div>
   </div>
-
+  
   <div id="chat" style="display:none;">
     <button id="logoutBtn">Logout</button>
-
-    <h2>Global Chat</h2>
-    <div id="globalMessages"></div>
-    <input id="globalInput" placeholder="Type a message..." />
-    <button id="globalSend">Send</button>
-
-    <h2>Direct Message</h2>
-    <input id="dmUser" placeholder="Recipient username" />
-    <div id="dmMessages"></div>
-    <input id="dmInput" placeholder="Type a DM..." />
-    <button id="dmSend">Send DM</button>
+    
+    <div class="chat-section">
+      <h2>Global Chat</h2>
+      <div id="globalMessages"></div>
+      <div class="input-group">
+        <input id="globalInput" placeholder="Type a message..." />
+        <button id="globalSend">Send</button>
+      </div>
+    </div>
+    
+    <div class="chat-section">
+      <h2>Direct Message</h2>
+      <div class="input-group">
+        <input id="dmUser" placeholder="Recipient username" />
+      </div>
+      <div id="dmMessages"></div>
+      <div class="input-group">
+        <input id="dmInput" placeholder="Type a DM..." />
+        <button id="dmSend">Send DM</button>
+      </div>
+    </div>
   </div>
 
-  <!-- FIXED -->
-  <script type="module" src="./app.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDocs, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCKEPD4fp4GSTv4lD1sKvIga9O8ImYsSHM",
+      authDomain: "tankajahariportal.firebaseapp.com",
+      projectId: "tankajahariportal",
+      storageBucket: "tankajahariportal.firebasestorage.app",
+      messagingSenderId: "547424748543",
+      appId: "1:547424748543:web:0ec55a74492ffac3b15dca"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const db = getFirestore();
+
+    // Elements
+    const authDiv = document.getElementById("auth");
+    const chatDiv = document.getElementById("chat");
+    const authError = document.getElementById("authError");
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const loginBtn = document.getElementById("loginBtn");
+    const registerBtn = document.getElementById("registerBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const globalMessages = document.getElementById("globalMessages");
+    const globalInput = document.getElementById("globalInput");
+    const globalSend = document.getElementById("globalSend");
+    const dmUser = document.getElementById("dmUser");
+    const dmMessages = document.getElementById("dmMessages");
+    const dmInput = document.getElementById("dmInput");
+    const dmSend = document.getElementById("dmSend");
+
+    let currentDMListener = null;
+
+    function showError(message) {
+      authError.textContent = message;
+      authError.style.display = 'block';
+      setTimeout(() => authError.style.display = 'none', 5000);
+    }
+
+    function fakeEmail(username) {
+      return `${username}@chatapp.com`;
+    }
+
+    // Register
+    registerBtn.onclick = async () => {
+      try {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username || !password) {
+          showError("Please enter username and password");
+          return;
+        }
+
+        if (password.length < 6) {
+          showError("Password must be at least 6 characters");
+          return;
+        }
+
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("username", "==", username));
+        const snap = await getDocs(q);
+
+        if (!snap.empty) {
+          showError("Username already taken");
+          return;
+        }
+
+        const email = fakeEmail(username);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        await updateProfile(user, { displayName: username });
+        await setDoc(doc(db, "users", user.uid), { username });
+
+        usernameInput.value = "";
+        passwordInput.value = "";
+      } catch (error) {
+        console.error("Register error:", error);
+        showError(error.message);
+      }
+    };
+
+    // Login
+    loginBtn.onclick = async () => {
+      try {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (!username || !password) {
+          showError("Please enter username and password");
+          return;
+        }
+
+        const email = fakeEmail(username);
+        await signInWithEmailAndPassword(auth, email, password);
+        
+        usernameInput.value = "";
+        passwordInput.value = "";
+      } catch (error) {
+        console.error("Login error:", error);
+        showError("Invalid username or password");
+      }
+    };
+
+    // Logout
+    logoutBtn.onclick = async () => {
+      await signOut(auth);
+    };
+
+    // Auth state
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        authDiv.style.display = "none";
+        chatDiv.style.display = "block";
+        startGlobalChat();
+      } else {
+        authDiv.style.display = "block";
+        chatDiv.style.display = "none";
+        if (currentDMListener) {
+          currentDMListener();
+          currentDMListener = null;
+        }
+      }
+    });
+
+    // Global Chat
+    function startGlobalChat() {
+      const q = query(collection(db, "globalMessages"), orderBy("createdAt", "asc"));
+      onSnapshot(q, snapshot => {
+        globalMessages.innerHTML = "";
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          const div = document.createElement("div");
+          div.className = "message";
+          if (data.username === auth.currentUser?.displayName) {
+            div.classList.add("own");
+          }
+          div.textContent = `${data.username}: ${data.text}`;
+          globalMessages.appendChild(div);
+        });
+        globalMessages.scrollTop = globalMessages.scrollHeight;
+      });
+    }
+
+    globalSend.onclick = sendGlobalMessage;
+    globalInput.onkeypress = (e) => {
+      if (e.key === 'Enter') sendGlobalMessage();
+    };
+
+    async function sendGlobalMessage() {
+      const text = globalInput.value.trim();
+      if (!text) return;
+
+      try {
+        await addDoc(collection(db, "globalMessages"), {
+          username: auth.currentUser.displayName,
+          text,
+          createdAt: serverTimestamp()
+        });
+        globalInput.value = "";
+      } catch (error) {
+        console.error("Error sending message:", error);
+        alert("Failed to send message. Check console for details.");
+      }
+    }
+
+    // Direct Messages
+    dmUser.onchange = () => {
+      const toUser = dmUser.value.trim();
+      if (toUser) startDM();
+    };
+
+    dmSend.onclick = sendDM;
+    dmInput.onkeypress = (e) => {
+      if (e.key === 'Enter') sendDM();
+    };
+
+    async function sendDM() {
+      const toUser = dmUser.value.trim();
+      const text = dmInput.value.trim();
+      
+      if (!toUser) {
+        alert("Please enter a recipient username");
+        return;
+      }
+      if (!text) return;
+
+      const from = auth.currentUser.displayName;
+      const id = [from, toUser].sort().join("_");
+
+      try {
+        await addDoc(collection(db, "dms", id, "messages"), {
+          from,
+          to: toUser,
+          text,
+          createdAt: serverTimestamp()
+        });
+        dmInput.value = "";
+      } catch (error) {
+        console.error("Error sending DM:", error);
+        alert("Failed to send DM. Check console for details.");
+      }
+    }
+
+    function startDM() {
+      const toUser = dmUser.value.trim();
+      if (!toUser || !auth.currentUser) return;
+
+      const from = auth.currentUser.displayName;
+      const id = [from, toUser].sort().join("_");
+
+      if (currentDMListener) currentDMListener();
+
+      const q = query(collection(db, "dms", id, "messages"), orderBy("createdAt", "asc"));
+      currentDMListener = onSnapshot(q, snapshot => {
+        dmMessages.innerHTML = "";
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          const div = document.createElement("div");
+          div.className = "message";
+          if (data.from === auth.currentUser?.displayName) {
+            div.classList.add("own");
+          }
+          div.textContent = `${data.from}: ${data.text}`;
+          dmMessages.appendChild(div);
+        });
+        dmMessages.scrollTop = dmMessages.scrollHeight;
+      });
+    }
+  </script>
 </body>
 </html>
