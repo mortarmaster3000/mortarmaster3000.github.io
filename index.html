@@ -1,10 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>My First GitHub Page</title>
+  <title>Chat App</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>It works 🎉</h1>
-  <p>If you see this, your GitHub Pages site is working.</p>
+  <div id="auth">
+    <h2>Login / Register</h2>
+    <input id="username" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="loginBtn">Login</button>
+    <button id="registerBtn">Register</button>
+  </div>
+
+  <div id="chat" style="display:none;">
+    <button id="logoutBtn">Logout</button>
+
+    <h2>Global Chat</h2>
+    <div id="globalMessages"></div>
+    <input id="globalInput" placeholder="Type a message..." />
+    <button id="globalSend">Send</button>
+
+    <h2>Direct Message</h2>
+    <input id="dmUser" placeholder="Recipient username" />
+    <div id="dmMessages"></div>
+    <input id="dmInput" placeholder="Type a DM..." />
+    <button id="dmSend">Send DM</button>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
