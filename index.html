@@ -326,7 +326,7 @@
         globalInput.value = "";
       } catch (error) {
         console.error("Error sending message:", error);
-        alert("Failed to send message. Check console for details.");
+        showError("Failed to send message: " + error.message);
       }
     }
 
@@ -346,7 +346,7 @@
       const text = dmInput.value.trim();
       
       if (!toUser) {
-        alert("Please enter a recipient username");
+        showError("Please enter a recipient username");
         return;
       }
       if (!text) return;
@@ -364,7 +364,7 @@
         dmInput.value = "";
       } catch (error) {
         console.error("Error sending DM:", error);
-        alert("Failed to send DM. Check console for details.");
+        showError("Failed to send DM: " + error.message);
       }
     }
 
