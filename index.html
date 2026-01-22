@@ -680,13 +680,13 @@
       <div class="sidebar-header">
         <h3>Messages</h3>
         <div style="display: flex; gap: 8px;">
-          <button class="new-dm-btn" id="friendsBtn">👥</button>
+          <button class="new-dm-btn" id="friendsBtn">Friends</button>
+          <button class="new-dm-btn" id="settingsBtn">⚙</button>
           <button class="new-dm-btn" id="newDmBtn">+ New</button>
         </div>
       </div>
       <div class="conversations-container" id="conversationsList">
         <div class="empty-state">
-          <div class="empty-state-icon">💬</div>
           <div class="empty-state-title">No conversations yet</div>
           <div>Start a DM or create a group!</div>
         </div>
@@ -734,7 +734,6 @@
         </div>
         <div class="messages-container" id="messagesContainer">
           <div class="empty-state">
-            <div class="empty-state-icon">👋</div>
             <div class="empty-state-title">Welcome!</div>
             <div>Select a conversation or start a new one</div>
           </div>
@@ -773,6 +772,13 @@
     let friendsListener = null;
     let conversations = new Map();
     let currentFriendsTab = 'all';
+    let allUsers = [];
+    let userSettings = {
+      allowNonFriendsDM: true,
+      messageNotifications: true,
+      friendRequestNotifications: true,
+      showTimestamps: true
+    };
 
     function showToast(message, type = 'info') {
       const toast = document.createElement('div');
@@ -793,6 +799,71 @@
 
     function getConversationId(users) {
       return users.sort().join("_");
+    }
+
+    async function loadAllUsers() {
+      const usersRef = collection(db, "users");
+      const snapshot = await getDocs(usersRef);
+      allUsers = [];
+      snapshot.forEach(docSnap => {
+        const username = docSnap.data().username;
+        if (username !== auth.currentUser?.displayName) {
+          allUsers.push(username);
+        }
+      });
+    }
+
+    async function loadUserSettings() {
+      try {
+        const settingsDoc = await getDocs(query(collection(db, "userSettings"), where("userId", "==", auth.currentUser.uid)));
+        if (!settingsDoc.empty) {
+          const data = settingsDoc.docs[0].data();
+          userSettings = { ...userSettings, ...data };
+        }
+        document.getElementById("allowNonFriendsDM").checked = userSettings.allowNonFriendsDM;
+        document.getElementById("messageNotifications").checked = userSettings.messageNotifications;
+        document.getElementById("friendRequestNotifications").checked = userSettings.friendRequestNotifications;
+        document.getElementById("showTimestamps").checked = userSettings.showTimestamps;
+        
+        setupToggleSwitches();
+      } catch (error) {
+        console.log("Settings load error:", error);
+      }
+    }
+
+    function setupToggleSwitches() {
+      const switches = ['allowNonFriendsDM', 'messageNotifications', 'friendRequestNotifications', 'showTimestamps'];
+      switches.forEach(id => {
+        const checkbox = document.getElementById(id);
+        const toggle = checkbox.nextElementSibling;
+        const slider = toggle.nextElementSibling;
+        
+        function updateToggle() {
+          if (checkbox.checked) {
+            toggle.style.backgroundColor = '#ff3333';
+            slider.style.transform = 'translateX(26px)';
+          } else {
+            toggle.style.backgroundColor = '#333';
+            slider.style.transform = 'translateX(0)';
+          }
+        }
+        
+        updateToggle();
+        
+        checkbox.onchange = async () => {
+          updateToggle();
+          userSettings[id] = checkbox.checked;
+          try {
+            await setDoc(doc(db, "userSettings", auth.currentUser.uid), {
+              userId: auth.currentUser.uid,
+              ...userSettings
+            });
+            showToast("Settings saved", "success");
+          } catch (error) {
+            showToast("Failed to save settings", "error");
+          }
+        };
+      });
     }
 
     document.getElementById("registerBtn").onclick = async () => {
@@ -850,6 +921,8 @@
         document.getElementById("chat").style.display = "flex";
         document.getElementById("usernameDisplay").textContent = user.displayName;
         loadConversations();
+        loadUserSettings();
+        loadAllUsers();
       } else {
         document.getElementById("auth").style.display = "block";
         document.getElementById("chat").style.display = "none";
@@ -858,6 +931,7 @@
         if (friendsListener) friendsListener();
         conversations.clear();
         currentConversation = null;
+        allUsers = [];
       }
     });
 
@@ -887,7 +961,6 @@
       if (conversations.size === 0) {
         container.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">💬</div>
             <div class="empty-state-title">No conversations yet</div>
             <div>Start a DM or create a group!</div>
           </div>
@@ -906,7 +979,7 @@
         
         let html = `
           <div class="conversation-info">
-            <div class="conversation-name">${isGroup ? '👥 ' : ''}${displayName}</div>
+            <div class="conversation-name">${isGroup ? 'Group: ' : ''}${displayName}</div>
         `;
         
         if (isGroup) {
@@ -939,7 +1012,7 @@
       const isGroup = conv.members.length > 2;
       
       document.getElementById("chatHeader").style.display = "flex";
-      document.getElementById("chatTitle").textContent = (isGroup ? '👥 ' : '') + displayName;
+      document.getElementById("chatTitle").textContent = (isGroup ? 'Group: ' : '') + displayName;
       
       if (isGroup) {
         document.getElementById("chatMembers").textContent = conv.members.join(", ");
@@ -970,7 +1043,7 @@
           }
           
           let timestamp = "";
-          if (data.createdAt) {
+          if (data.createdAt && userSettings.showTimestamps) {
             const date = data.createdAt.toDate();
             const now = new Date();
             const isToday = date.toDateString() === now.toDateString();
@@ -1025,12 +1098,27 @@
 
     document.getElementById("friendsBtn").onclick = () => {
       document.getElementById("chatView").style.display = "none";
+      document.getElementById("settingsView").style.display = "none";
       document.getElementById("friendsView").style.display = "block";
       loadFriends();
     };
 
+    document.getElementById("settingsBtn").onclick = () => {
+      document.getElementById("chatView").style.display = "none";
+      document.getElementById("friendsView").style.display = "none";
+      document.getElementById("settingsView").style.display = "block";
+    };
+
+    document.getElementById("backFromSettingsBtn").onclick = () => {
+      document.getElementById("settingsView").style.display = "none";
+      document.getElementById("friendsView").style.display = "none";
+      document.getElementById("chatView").style.display = "flex";
+      document.getElementById("chatView").style.flexDirection = "column";
+    };
+
     document.getElementById("backToMessagesBtn").onclick = () => {
       document.getElementById("friendsView").style.display = "none";
+      document.getElementById("settingsView").style.display = "none";
       document.getElementById("chatView").style.display = "flex";
       document.getElementById("chatView").style.flexDirection = "column";
     };
@@ -1050,40 +1138,65 @@
       };
     });
 
-    document.getElementById("sendFriendRequestBtn").onclick = async () => {
-      const username = document.getElementById("addFriendInput").value.trim();
-      if (!username) {
-        showToast("Please enter a username", "warning");
+    const addFriendInput = document.getElementById("addFriendInput");
+    const addFriendDropdown = document.getElementById("addFriendDropdown");
+
+    addFriendInput.oninput = () => {
+      const searchTerm = addFriendInput.value.trim().toLowerCase();
+      
+      if (searchTerm.length === 0) {
+        addFriendDropdown.style.display = 'none';
         return;
       }
-      if (username === auth.currentUser.displayName) {
-        showToast("You can't add yourself as a friend!", "warning");
+
+      const matches = allUsers.filter(user => 
+        user.toLowerCase().includes(searchTerm)
+      );
+
+      if (matches.length === 0) {
+        addFriendDropdown.innerHTML = '<div class="user-select-item">No users found</div>';
+        addFriendDropdown.style.display = 'block';
         return;
       }
-      
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("username", "==", username));
-      const snap = await getDocs(q);
-      
-      if (snap.empty) {
-        showToast("User not found", "error");
-        return;
-      }
-      
-      try {
-        const friendRequestId = [auth.currentUser.displayName, username].sort().join("_");
-        await setDoc(doc(db, "friendRequests", friendRequestId), {
-          from: auth.currentUser.displayName,
-          to: username,
-          status: "pending",
-          createdAt: serverTimestamp()
-        });
-        showToast("Friend request sent!", "success");
-        document.getElementById("addFriendInput").value = "";
-      } catch (error) {
-        showToast("Failed to send friend request", "error");
-      }
+
+      addFriendDropdown.innerHTML = '';
+      matches.forEach(username => {
+        const div = document.createElement('div');
+        div.className = 'user-select-item';
+        div.textContent = username;
+        div.onclick = async () => {
+          addFriendInput.value = "";
+          addFriendDropdown.style.display = 'none';
+          
+          if (username === auth.currentUser.displayName) {
+            showToast("You can't add yourself as a friend!", "warning");
+            return;
+          }
+          
+          try {
+            const friendRequestId = [auth.currentUser.displayName, username].sort().join("_");
+            await setDoc(doc(db, "friendRequests", friendRequestId), {
+              from: auth.currentUser.displayName,
+              to: username,
+              status: "pending",
+              createdAt: serverTimestamp()
+            });
+            showToast("Friend request sent!", "success");
+          } catch (error) {
+            showToast("Failed to send friend request", "error");
+          }
+        };
+        addFriendDropdown.appendChild(div);
+      });
+
+      addFriendDropdown.style.display = 'block';
     };
+
+    document.addEventListener('click', (e) => {
+      if (!addFriendInput.contains(e.target) && !addFriendDropdown.contains(e.target)) {
+        addFriendDropdown.style.display = 'none';
+      }
+    });
 
     function loadFriends() {
       const currentUser = auth.currentUser.displayName;
@@ -1121,7 +1234,7 @@
       
       if (currentFriendsTab === 'all') {
         if (friends.length === 0) {
-          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">😢</div><div class="empty-state-title">No friends yet</div><div>Add some friends to get started!</div></div>';
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-title">No friends yet</div><div>Add some friends to get started!</div></div>';
           return;
         }
         friends.forEach(friend => {
@@ -1143,7 +1256,7 @@
         });
       } else if (currentFriendsTab === 'pending') {
         if (pending.length === 0) {
-          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No pending requests</div></div>';
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-title">No pending requests</div></div>';
           return;
         }
         pending.forEach(request => {
@@ -1232,6 +1345,7 @@
 
     async function startDMWithFriend(friendUsername) {
       document.getElementById("friendsView").style.display = "none";
+      document.getElementById("settingsView").style.display = "none";
       document.getElementById("chatView").style.display = "flex";
       document.getElementById("chatView").style.flexDirection = "column";
       
@@ -1301,17 +1415,22 @@
       const friendRequestsRef = collection(db, "friendRequests");
       const snapshot = await getDocs(friendRequestsRef);
       
-      const friendsList = [];
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.status === "accepted") {
-          if (data.from === currentUser) {
-            friendsList.push(data.to);
-          } else if (data.to === currentUser) {
-            friendsList.push(data.from);
+      let friendsList = [];
+      
+      if (userSettings.allowNonFriendsDM) {
+        friendsList = allUsers;
+      } else {
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.status === "accepted") {
+            if (data.from === currentUser) {
+              friendsList.push(data.to);
+            } else if (data.to === currentUser) {
+              friendsList.push(data.from);
+            }
           }
-        }
-      });
+        });
+      }
       
       const selectedUsers = new Set();
       const userSearchInput = document.getElementById('userSearchInput');
@@ -1338,7 +1457,7 @@
           userSelectList.appendChild(div);
         });
         if (filtered.length === 0) {
-          userSelectList.innerHTML = '<div style="padding:10px;color:#72767d;text-align:center;">No friends found</div>';
+          userSelectList.innerHTML = '<div style="padding:10px;color:#72767d;text-align:center;">No users found</div>';
         }
       }
       
@@ -1365,7 +1484,7 @@
       
       document.getElementById('createConvBtn').onclick = async () => {
         if (selectedUsers.size === 0) {
-          showToast("Please select at least one friend", "warning");
+          showToast("Please select at least one user", "warning");
           return;
         }
         const groupName = document.getElementById('groupNameInput').value.trim();
@@ -1415,7 +1534,6 @@
             document.getElementById("messageInputContainer").style.display = "none";
             document.getElementById("messagesContainer").innerHTML = `
               <div class="empty-state">
-                <div class="empty-state-icon">👋</div>
                 <div class="empty-state-title">Welcome!</div>
                 <div>Select a conversation or start a new one</div>
               </div>
