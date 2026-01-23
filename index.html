@@ -273,6 +273,9 @@
     .message-input-container {
       padding: 20px;
       background: #1a1a1a;
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
     }
     .message-input-wrapper {
       display: flex;
@@ -467,6 +470,8 @@
     }
     .friends-container {
       padding: 20px;
+      height: 100%;
+      overflow-y: auto;
     }
     .friends-header {
       display: flex;
@@ -689,7 +694,7 @@
     </div>
     
     <div class="main-content">
-      <div id="settingsView" style="display:none;">
+      <div id="settingsView" style="display:none; height: 100%; overflow-y: auto;">
         <div class="friends-container">
           <div class="friends-header">
             <h2>Settings</h2>
@@ -760,7 +765,7 @@
         </div>
       </div>
 
-      <div id="friendsView" style="display:none;">
+      <div id="friendsView" style="display:none; height: 100%; overflow-y: auto;">
         <div class="friends-container">
           <div class="friends-header">
             <h2>Friends</h2>
@@ -1282,6 +1287,14 @@
 
     document.getElementById("newDmBtn").onclick = () => {
       showNewDmModal();
+    };
+
+    document.getElementById("backToMessagesBtn").onclick = () => {
+      document.getElementById("friendsView").style.display = "none";
+      document.getElementById("settingsView").style.display = "none";
+      document.getElementById("chatView").style.display = "flex";
+      document.getElementById("chatView").style.flexDirection = "column";
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     };
 
     document.getElementById("backFromSettingsBtn").onclick = () => {
