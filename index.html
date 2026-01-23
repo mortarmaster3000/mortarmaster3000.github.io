@@ -848,7 +848,7 @@
       friendRequestNotifications: true,
       showTimestamps: true
     };
-    const ADMIN_USERNAMES = ['TanakJahari'];
+    const ADMIN_USERNAMES = ['TankaJahari'];
 
     function showToast(message, type = 'info') {
       const toast = document.createElement('div');
@@ -1238,7 +1238,9 @@
           `;
           container.appendChild(div);
         });
-        container.scrollTop = container.scrollHeight;
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight;
+        }, 100);
       });
     }
 
@@ -1264,6 +1266,9 @@
           createdAt: serverTimestamp()
         });
         document.getElementById("messageInput").value = "";
+        setTimeout(() => {
+          document.getElementById("messagesContainer").scrollTop = document.getElementById("messagesContainer").scrollHeight;
+        }, 100);
       } catch (error) {
         showToast("Failed to send message", "error");
       }
