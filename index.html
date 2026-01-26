@@ -872,10 +872,6 @@
         </div>
         <div class="message-input-container" id="messageInputContainer" style="display:none;">
           <div class="message-input-wrapper">
-            <label class="file-input-label">
-              <input type="file" id="fileInput" accept="image/*,video/*,.pdf,.doc,.docx,.txt" />
-              📎
-            </label>
             <input id="messageInput" placeholder="Type a message..." disabled />
             <button id="sendBtn" class="send-btn" disabled>➤</button>
           </div>
@@ -888,7 +884,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDocs, where, serverTimestamp, deleteDoc, updateDoc, arrayRemove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBzt2lJe_cIK_U7Uh88Wun73dG7GxQMYh4",
@@ -902,7 +897,6 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth();
     const db = getFirestore();
-    const storage = getStorage();
 
     let currentConversation = null;
     let currentDMListener = null;
@@ -1311,32 +1305,12 @@
             }
           }
           
-          let messageContent = '';
-          if (data.fileURL) {
-            if (data.fileType && data.fileType.startsWith('image/')) {
-              messageContent = `<img src="${data.fileURL}" class="message-image" onclick="showImageModal('${data.fileURL}')" />`;
-            } else {
-              const fileName = data.fileName || 'file';
-              const fileSize = data.fileSize ? formatFileSize(data.fileSize) : '';
-              messageContent = `
-                <a href="${data.fileURL}" target="_blank" class="message-file">
-                  <span class="file-icon">📄</span>
-                  <div class="file-info">
-                    <span class="file-name">${fileName}</span>
-                    <span class="file-size">${fileSize}</span>
-                  </div>
-                </a>
-              `;
-            }
-          }
-          
           div.innerHTML = `
             <div class="message-header">
               <div class="message-author">${data.from}</div>
               <div class="message-timestamp">${timestamp}</div>
             </div>
-            ${data.text ? `<div class="message-text">${data.text}</div>` : ''}
-            ${messageContent}
+            <div class="message-text">${data.text}</div>
           `;
           container.appendChild(div);
         });
@@ -1350,72 +1324,6 @@
     document.getElementById("sendBtn").onclick = sendMessage;
     document.getElementById("messageInput").onkeypress = (e) => {
       if (e.key === 'Enter') sendMessage();
-    };
-
-    function formatFileSize(bytes) {
-      if (bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    }
-
-    window.showImageModal = function(url) {
-      const modal = document.createElement('div');
-      modal.className = 'image-modal';
-      modal.innerHTML = `<img src="${url}" />`;
-      modal.onclick = () => modal.remove();
-      document.body.appendChild(modal);
-    }
-
-    document.getElementById("fileInput").onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (file.size > maxSize) {
-        showToast("File too large! Maximum size is 10MB", "error");
-        e.target.value = '';
-        return;
-      }
-      
-      if (!currentConversation) {
-        showToast("Please select a conversation first", "error");
-        e.target.value = '';
-        return;
-      }
-      
-      try {
-        showToast("Uploading file...", "info");
-        const storageRef = ref(storage, `chat-files/${currentConversation}/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        const fileURL = await getDownloadURL(storageRef);
-        
-        const conv = conversations.get(currentConversation);
-        await setDoc(doc(db, "dms", currentConversation), {
-          members: conv.members,
-          groupName: conv.groupName || null,
-          lastMessage: file.type.startsWith('image/') ? '📷 Image' : `📄 ${file.name}`,
-          lastMessageTime: serverTimestamp()
-        }, { merge: true });
-        
-        await addDoc(collection(db, "dms", currentConversation, "messages"), {
-          from: auth.currentUser.displayName,
-          text: "",
-          fileURL: fileURL,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          createdAt: serverTimestamp()
-        });
-        
-        e.target.value = '';
-        showToast("File sent!", "success");
-      } catch (error) {
-        console.error("File upload error:", error);
-        showToast("Failed to upload file", "error");
-        e.target.value = '';
-      }
     };
 
     async function sendMessage() {
