@@ -1650,8 +1650,11 @@
             <input type="text" class="modal-input" id="groupNameInput" placeholder="Leave empty for DM" />
             
             <label class="modal-label">Select Users</label>
-            <input type="text" class="modal-input" id="userSearchInput" placeholder="Search users..." />
-            <div class="user-select-list" id="userSelectList"></div>
+            <div style="position: relative;">
+              <input type="text" class="modal-input" id="userSearchInput" placeholder="Search users..." autocomplete="off" />
+              <div id="userSearchDropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid #333; border-radius: 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; margin-top: 5px;">
+              </div>
+            </div>
             
             <div class="selected-users" id="selectedUsersList"></div>
           </div>
@@ -1695,32 +1698,43 @@
       
       const selectedUsers = new Set();
       const userSearchInput = document.getElementById('userSearchInput');
-      const userSelectList = document.getElementById('userSelectList');
+      const userSearchDropdown = document.getElementById('userSearchDropdown');
       const selectedUsersList = document.getElementById('selectedUsersList');
       
-      function updateUserList(searchTerm = '') {
-        userSelectList.innerHTML = '';
-        const filtered = friendsList.filter(u => 
-          u.toLowerCase().includes(searchTerm.toLowerCase()) && !selectedUsers.has(u)
+      userSearchInput.oninput = () => {
+        const searchTerm = userSearchInput.value.trim().toLowerCase();
+        
+        if (searchTerm.length === 0) {
+          userSearchDropdown.style.display = 'none';
+          return;
+        }
+
+        const matches = friendsList.filter(user => 
+          user.toLowerCase().includes(searchTerm) && !selectedUsers.has(user)
         );
-        filtered.forEach(username => {
+
+        if (matches.length === 0) {
+          userSearchDropdown.innerHTML = '<div class="user-select-item">No users found</div>';
+          userSearchDropdown.style.display = 'block';
+          return;
+        }
+
+        userSearchDropdown.innerHTML = '';
+        matches.forEach(username => {
           const div = document.createElement('div');
           div.className = 'user-select-item';
-          div.innerHTML = `
-            <input type="checkbox" class="user-checkbox" />
-            <span>${username}</span>
-          `;
+          div.textContent = username;
           div.onclick = () => {
             selectedUsers.add(username);
             updateSelectedUsers();
-            updateUserList(userSearchInput.value);
+            userSearchInput.value = '';
+            userSearchDropdown.style.display = 'none';
           };
-          userSelectList.appendChild(div);
+          userSearchDropdown.appendChild(div);
         });
-        if (filtered.length === 0) {
-          userSelectList.innerHTML = '<div style="padding:10px;color:#72767d;text-align:center;">No users found</div>';
-        }
-      }
+
+        userSearchDropdown.style.display = 'block';
+      };
       
       function updateSelectedUsers() {
         selectedUsersList.innerHTML = '';
@@ -1734,14 +1748,10 @@
           tag.querySelector('.remove-user').onclick = () => {
             selectedUsers.delete(username);
             updateSelectedUsers();
-            updateUserList(userSearchInput.value);
           };
           selectedUsersList.appendChild(tag);
         });
       }
-      
-      userSearchInput.oninput = (e) => updateUserList(e.target.value);
-      updateUserList();
       
       document.getElementById('createConvBtn').onclick = async () => {
         if (selectedUsers.size === 0) {
@@ -1764,6 +1774,18 @@
           showToast("Failed to create conversation", "error");
         }
       };
+      
+      // Close dropdown when clicking outside
+      document.addEventListener('click', function closeDropdown(e) {
+        if (!userSearchInput.contains(e.target) && !userSearchDropdown.contains(e.target)) {
+          userSearchDropdown.style.display = 'none';
+        }
+        // Remove listener when modal is closed
+        const modal = document.querySelector('.modal-overlay');
+        if (!modal) {
+          document.removeEventListener('click', closeDropdown);
+        }
+      });
     }
 
     function leaveConversation(conversationId) {
