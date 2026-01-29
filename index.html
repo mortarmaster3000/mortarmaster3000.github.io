@@ -1202,26 +1202,19 @@
         if (currentDMListener) currentDMListener();
         if (conversationsListener) conversationsListener();
         if (friendsListener) friendsListener();
+        if (readTimesListener) readTimesListener();
+        messageListeners.forEach(listener => listener());
+        messageListeners.clear();
         conversations.clear();
         currentConversation = null;
         allUsers = [];
+        readTimes.clear();
       }
     });
 
-    // NEW: Load last read times for user
-    async function loadLastReadTimes() {
-      const currentUser = auth.currentUser.displayName;
-      const readTimesRef = collection(db, "readTimes");
-      const q = query(readTimesRef, where("userId", "==", currentUser));
-      const snapshot = await getDocs(q);
-      
-      const readTimes = new Map();
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        readTimes.set(data.conversationId, data.lastRead?.toMillis() || 0);
-      });
-      return readTimes;
-    }
+    let readTimesListener = null;
+    let messageListeners = new Map();
+    let readTimes = new Map();
 
     // NEW: Update last read time when opening a conversation
     async function markConversationAsRead(conversationId) {
@@ -1239,18 +1232,34 @@
       }
     }
 
+    let readTimesListener = null;
+    let messageListeners = new Map();
+    let readTimes = new Map();
+
     function loadConversations() {
       const currentUser = auth.currentUser.displayName;
       const dmsRef = collection(db, "dms");
-      conversationsListener = onSnapshot(dmsRef, async snapshot => {
+      
+      // Listen to read times in real-time
+      const readTimesRef = collection(db, "readTimes");
+      const readTimesQuery = query(readTimesRef, where("userId", "==", currentUser));
+      readTimesListener = onSnapshot(readTimesQuery, snapshot => {
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          readTimes.set(data.conversationId, data.lastRead?.toMillis() || 0);
+        });
+        // Recalculate unread counts whenever read times update
+        recalculateUnreadCounts();
+      });
+      
+      conversationsListener = onSnapshot(dmsRef, snapshot => {
         conversations.clear();
-        unreadCount = 0;
-        conversationUnreadCounts.clear();
         
-        // Load read times
-        const readTimes = await loadLastReadTimes();
+        // Clear old message listeners
+        messageListeners.forEach(listener => listener());
+        messageListeners.clear();
         
-        for (const docSnap of snapshot.docs) {
+        snapshot.forEach(docSnap => {
           const data = docSnap.data();
           if (data.members && data.members.includes(currentUser)) {
             const convId = docSnap.id;
@@ -1261,35 +1270,53 @@
               lastMessage: data.lastMessage || null
             });
             
-            // Count unread messages
-            if (convId !== currentConversation) {
-              const messagesRef = collection(db, "dms", convId, "messages");
-              const messagesSnapshot = await getDocs(messagesRef);
-              
-              const lastReadTime = readTimes.get(convId) || 0;
-              let unreadForConv = 0;
-              
-              messagesSnapshot.forEach(msgDoc => {
-                const msgData = msgDoc.data();
-                const msgTime = msgData.createdAt?.toMillis() || 0;
-                
-                // Count as unread if message is after last read time and not from current user
-                if (msgTime > lastReadTime && msgData.from !== currentUser) {
-                  unreadForConv++;
-                }
-              });
-              
-              if (unreadForConv > 0) {
-                conversationUnreadCounts.set(convId, unreadForConv);
-                unreadCount += unreadForConv;
-              }
-            }
+            // Listen to messages in real-time for each conversation
+            const messagesRef = collection(db, "dms", convId, "messages");
+            const messagesQuery = query(messagesRef, orderBy("createdAt", "asc"));
+            const unsubscribe = onSnapshot(messagesQuery, () => {
+              // Recalculate unread when messages change
+              recalculateUnreadCounts();
+            });
+            messageListeners.set(convId, unsubscribe);
           }
-        }
+        });
         
-        updateConversationsList();
-        updatePageTitle();
+        recalculateUnreadCounts();
       });
+    }
+
+    async function recalculateUnreadCounts() {
+      const currentUser = auth.currentUser.displayName;
+      unreadCount = 0;
+      conversationUnreadCounts.clear();
+      
+      for (const [convId, conv] of conversations) {
+        if (convId === currentConversation) continue;
+        
+        const messagesRef = collection(db, "dms", convId, "messages");
+        const messagesSnapshot = await getDocs(messagesRef);
+        
+        const lastReadTime = readTimes.get(convId) || 0;
+        let unreadForConv = 0;
+        
+        messagesSnapshot.forEach(msgDoc => {
+          const msgData = msgDoc.data();
+          const msgTime = msgData.createdAt?.toMillis() || 0;
+          
+          // Count as unread if message is after last read time and not from current user
+          if (msgTime > lastReadTime && msgData.from !== currentUser) {
+            unreadForConv++;
+          }
+        });
+        
+        if (unreadForConv > 0) {
+          conversationUnreadCounts.set(convId, unreadForConv);
+          unreadCount += unreadForConv;
+        }
+      }
+      
+      updateConversationsList();
+      updatePageTitle();
     }
 
     function updateConversationsList() {
