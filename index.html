@@ -925,6 +925,8 @@
     let currentDMListener = null;
     let conversationsListener = null;
     let friendsListener = null;
+    let readTimesListener = null;
+    let messageListeners = new Map();
     let conversations = new Map();
     let currentFriendsTab = 'all';
     let allUsers = [];
@@ -935,7 +937,8 @@
     const ADMIN_USERNAMES = ['TankaJahari'];
     let unreadCount = 0;
     let lastMessageCounts = new Map();
-    let conversationUnreadCounts = new Map(); // NEW: Track unread per conversation
+    let conversationUnreadCounts = new Map();
+    let readTimes = new Map();
 
     function updatePageTitle() {
       const baseTitle = "Chat";
@@ -1212,10 +1215,6 @@
       }
     });
 
-    let readTimesListener = null;
-    let messageListeners = new Map();
-    let readTimes = new Map();
-
     // NEW: Update last read time when opening a conversation
     async function markConversationAsRead(conversationId) {
       const currentUser = auth.currentUser.displayName;
@@ -1231,10 +1230,6 @@
         console.log("Failed to update read time:", error);
       }
     }
-
-    let readTimesListener = null;
-    let messageListeners = new Map();
-    let readTimes = new Map();
 
     function loadConversations() {
       const currentUser = auth.currentUser.displayName;
